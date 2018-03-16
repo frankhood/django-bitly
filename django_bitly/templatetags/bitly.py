@@ -1,4 +1,5 @@
 import six
+import logging
 
 from django.template import Library
 
@@ -6,6 +7,8 @@ from django_bitly.models import Bittle
 from django_bitly.exceptions import BittleException
 
 import urllib
+
+logger= logging.getLogger('bitly')
 
 register = Library()
 
@@ -103,3 +106,35 @@ def referrer_chart(value, chs="250x100"):
         return referrers
     except Bittle.DoesNotExist:
         pass
+
+try:
+    from classytags.core import Options
+    from classytags.core import Tag as TemplateTag
+    from classytags.arguments import Argument
+    from classytags.exceptions import ArgumentRequiredError
+    from ..bitly import Bitly
+    
+    class BitlifyTag(TemplateTag):
+        name = 'bitlify_url'
+        """ example: 
+            {% bitlify_url 'http://www.google.it/' as bitlified_url %}
+        """
+        
+        options = Options(
+            Argument('value', required=True, resolve=True),
+            'as', Argument('varname', required=False, resolve=False),
+        )
+        
+        def render_tag(self, context, value, varname):
+            bitlified_url = Bitly().shorten_url(value)
+            if varname:
+                context.update({
+                    varname:bitlified_url,
+                })
+                return ''
+            return bitlified_url
+        
+    register.tag(BitlifyTag)
+except ImportError:
+    logger.debug("classytags is required if you want to use bitlify_url")
+

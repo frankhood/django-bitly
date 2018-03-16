@@ -20,7 +20,7 @@ from django.conf import settings
 
 from .conf import BITLY_TIMEOUT
 from .exceptions import BittleException
-
+from .bitly import Bitly
 
 # Create your models here.
 class StringHolder(models.Model):
@@ -125,17 +125,9 @@ class BittleManager(models.Manager):
             return bittle
         except self.model.DoesNotExist:
             pass
-
-        create_api = 'http://api.bit.ly/shorten'
-        data = dict(version="2.0.1", longUrl=url, login=settings.BITLY_LOGIN,
-                    apiKey=settings.BITLY_API_KEY, history=1)
-        response = requests.post(create_api, data=data, timeout=BITLY_TIMEOUT)
-        if response.status_code != requests.codes.OK:
-            raise BittleException("Failed secondary: %s" % response.status_code)
-
-        link = response.json()
-        if link["errorCode"] == 0 and link["statusCode"] == "OK":
-            results = link["results"][url]
+        
+        try:
+            results = Bitly().shorten(url)
             bittle = Bittle(
                 content_object=obj, absolute_url=url,
                 hash=results["hash"],
@@ -145,8 +137,8 @@ class BittleManager(models.Manager):
             )
             bittle.save()
             return bittle
-        else:
-            raise BittleException("Failed secondary: %s" % link)
+        except BittleException as ex:
+            raise ex
 
 
 class Bittle(models.Model):
